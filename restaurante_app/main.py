@@ -1,6 +1,7 @@
 import flet as ft
 from views.clientes import clientes_view
 from views.funcionarios import funcionarios_view
+from views.mesas import mesas_view
 
 def main(page: ft.Page):
     page.title = "Sabor de Goiás"
@@ -90,6 +91,10 @@ def main(page: ft.Page):
             
         elif selecionado == 'Funcionários':
             conteudo.content = funcionarios_view(page)
+            page.update()
+            
+        elif selecionado == 'Mesas':
+            conteudo.content = mesas_view(page)
             page.update()
          
         else:

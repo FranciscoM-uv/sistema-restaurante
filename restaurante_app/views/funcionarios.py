@@ -9,29 +9,35 @@ def funcionarios_view(page):
         hint_text='Digite o nome',
         width=400
     )
-    cargo_funcionario = ft.TextField(
-        label='Cargo do Funcionário',
-        prefix=ft.Icon(ft.Icons.WORK, color='#168C8C'),
-        hint_text='Digite qual é o cargo',
+    cargo_funcionario = ft.Dropdown(
+        label='Cargo do funcionário',
+        options=[
+            ft.DropdownOption('Garçom'),
+            ft.DropdownOption('Cozinheiro'),
+            ft.DropdownOption('Gerente'),
+            ft.DropdownOption('Caixa'),
+            ft.DropdownOption('Atendente')
+            
+        ],
         width=400
-    )
+        )
     
     def cadastro_funcionario(e):
         if not nome_funcionario.value or not cargo_funcionario.value:
-                page.show_dialog(ft.SnackBar(content=ft.Text('Preencha com nome e cargo', bgcolor='#E65100'),
-                                             color='white'))
+                page.show_dialog(ft.SnackBar(content=ft.Text('Preencha com nome e cargo', color='white'),
+                                             bgcolor='#E65100'))
                 return
-        
+        nome_tratado = nome_funcionario.value.strip().title()
         try:
             with conectar() as conexao:
                 with conexao.cursor() as cursor:
                     cursor.execute(
                         'INSERT INTO funcionario(nome, cargo) VALUES (%s, %s)',
-                        (nome_funcionario.value, cargo_funcionario.value)
+                        (nome_tratado, cargo_funcionario.value)
                     )
         
             nome_funcionario.value = ''
-            cargo_funcionario.value = ''
+            cargo_funcionario.value = None
             page.show_dialog(ft.SnackBar(content=ft.Text('Cadastro com sucesso', color='white'),
                                                  bgcolor='#168C8C'))
             page.update()
