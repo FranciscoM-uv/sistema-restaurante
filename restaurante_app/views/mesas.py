@@ -20,12 +20,15 @@ def mesas_view(page):
             content=ft.Text(str(numero), color='white', size=28, weight=ft.FontWeight.BOLD),
             width=130,
             height=75,
-            bgcolor=cor
+            bgcolor=cor,
+            alignment=ft.Alignment(0, 0)
             
         )
         cards.append(card)
     return ft.Row(
         controls= cards,
-        wrap= True
+        wrap= True,
+        alignment=ft.MainAxisAlignment.CENTER,
+        expand=True
     )
     
