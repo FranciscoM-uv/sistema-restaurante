@@ -33,7 +33,7 @@ def main(page: ft.Page):
                     color="#172B4D"
                 ),
                 ft.Text(
-                    "Bem-vindo ao sistema Sabor da Terra!",
+                    "Bem-vindo ao sistema Sabor de Goiás!",
                     color="#64748B"
                 ),
                 ft.Row(
