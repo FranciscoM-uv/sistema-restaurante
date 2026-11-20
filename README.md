@@ -1,8 +1,6 @@
 # Sabor de Goiás
 
-Sistema de gestão para restaurante com interface desktop feita em **Python + Flet** e banco de dados **PostgreSQL**.
-
-Projeto em desenvolvimento, criado em formato de estudo, passo a passo.
+Sistema de gestão para restaurante, com cadastro de clientes e funcionários, mapa de mesas com reservas e controle de comandas.
 
 ## Tecnologias
 
@@ -16,118 +14,109 @@ Projeto em desenvolvimento, criado em formato de estudo, passo a passo.
 - [x] Tela inicial com cards clicáveis que levam às seções
 - [x] Menu lateral que acompanha a navegação (inclusive quando o clique vem dos cards)
 - [x] Barra superior colorida (AppBar)
-- [x] Cadastro de clientes
-  - [x] Máscara de telefone (`62 98761-1234`)
-  - [x] E-mail único (restrição `UNIQUE` no banco)
-  - [x] Validação de campos obrigatórios
-  - [x] Mensagens coloridas de sucesso e erro
-- [x] Cadastro de funcionários
-- [ ] Cargo como lista fixa (Dropdown) para padronizar os dados
-- [ ] Listagem de clientes e funcionários
-- [ ] Editar e excluir registros
-- [ ] Telas de Produtos, Mesas e Pedidos
+
+**Clientes**
+- [x] Cadastro com máscara de telefone (`62 98761-1234`)
+- [x] E-mail único (restrição `UNIQUE` no banco)
+- [x] Validação de campos obrigatórios
+- [x] Mensagens coloridas de sucesso e erro
+- [x] Consulta por nome ou telefone, sem diferenciar maiúsculas de minúsculas, com sugestões ao digitar
+- [x] Edição de cadastro
+- [x] Lista de clientes com comanda aberta, com a(s) mesa(s) de cada um
+- [x] Abertura de comanda em uma ou mais mesas (mesas juntadas)
+- [x] Fechamento de comanda
+
+**Mesas**
+- [x] Mapa de mesas com status calculado automaticamente: Livre, Ocupada ou Reservada
+- [x] Capacidade por mesa
+- [x] Cadastro de novas mesas
+- [x] Reservas com validação de capacidade, data e hora
+- [x] Cancelamento de reservas
+
+**Funcionários**
+- [x] Cadastro com cargo em lista fixa (Dropdown)
+- [x] Mudança de cargo com motivo
+- [x] Demissão sem apagar o registro (histórico preservado) e readmissão
+- [x] Histórico de admissão, mudanças de cargo, demissão e readmissão
+- [x] Autorização por PIN de gerente (PIN guardado com hash e salt)
+- [x] Trava para o último gerente ativo e para alterar o próprio cargo
+
+**Em desenvolvimento**
+- [ ] Tela de Produtos
+- [ ] Tela de Pedidos
+- [ ] Login por usuário e senha, com permissões por cargo
+- [ ] Eventos (aniversário, casamento, confraternização) ligados a reservas
+- [ ] Excluir clientes (hoje só é possível editar)
 
 ## Estrutura do projeto
 
 ```
 sistema_restaurante/
 ├── .gitignore
+├── README.md
 └── restaurante_app/
-    ├── main.py              # janela, menu lateral e navegação entre telas
-    ├── conexao.py           # conexão com o PostgreSQL (não vai para o GitHub)
+    ├── main.py            # janela, menu lateral e navegação entre telas
+    ├── conexao.py         # conexão com o PostgreSQL (não vai para o Git)
+    ├── .env               # credenciais do banco (não vai para o Git)
     └── views/
         ├── __init__.py
-        ├── clientes.py      # tela de cadastro de clientes
-        └── funcionarios.py  # tela de cadastro de funcionários
+        ├── clientes.py    # cadastro, lista de comandas abertas e consulta
+        ├── funcionarios.py# cadastro, equipe, cargos, demissão e histórico
+        ├── mesas.py       # mapa de mesas, reservas e nova mesa
+        └── produtos.py    # em desenvolvimento
 ```
 
 ## Banco de dados
 
-Banco: `restaurante`, com as tabelas:
+Tabelas principais:
 
-| Tabela | Colunas |
+| Tabela | Função |
 |---|---|
-| `cliente` | `id_cliente`, `nome`, `telefone`, `email` (único) |
-| `funcionario` | `id_funcionario`, `nome`, `cargo` |
-| `produto` | `id_produto`, `nome`, `categoria`, `preco` |
-| `mesa` | `id_mesa`, `numero_mesa`, `status` |
-| `pedido` | `id_pedido`, `data_horario`, `valor_total`, `id_cliente`, `id_funcionario`, `id_mesa` |
-| `item_pedido` | `id_pedido`, `id_produto`, `quantidade`, `preco_unitario` |
+| `cliente` | Dados dos clientes |
+| `funcionario` | Equipe, com cargo, situação (`ativo`) e `pin_hash` |
+| `funcionario_historico` | Registro de admissões, mudanças de cargo e demissões |
+| `mesa` | Número e capacidade das mesas |
+| `comanda` | Contas dos clientes, com status `aberta` ou `fechada` |
+| `comanda_mesa` | Liga uma comanda a uma ou mais mesas |
+| `reserva` | Reservas de mesas com data e hora |
 
-Restrição de e-mail único:
-
-```sql
-ALTER TABLE cliente ADD CONSTRAINT uq_cliente_email UNIQUE (email);
-```
+O status de cada mesa não é digitado: ele é calculado a partir das comandas abertas e das reservas ativas.
 
 ## Como rodar
 
-1. Clone o repositório e entre na pasta do projeto.
+1. Clone o repositório e entre na pasta do app:
+
+   ```powershell
+   git clone https://github.com/FranciscoM-uv/sistema-restaurante.git
+   cd sistema-restaurante/restaurante_app
+   ```
+
 2. Crie e ative o ambiente virtual:
 
-```bash
-python -m venv venv
-venv\Scripts\activate
-```
+   ```powershell
+   python -m venv venv
+   venv\Scripts\activate
+   ```
 
 3. Instale as dependências:
 
-```bash
-pip install flet "psycopg[binary]"
-```
+   ```powershell
+   pip install flet "psycopg[binary]" python-dotenv
+   ```
 
-4. Crie o arquivo `restaurante_app/conexao.py` (ele não vem no repositório porque contém a senha do banco):
+4. Crie o banco `restaurante` no PostgreSQL e as tabelas listadas acima.
 
-```python
-import psycopg
+5. Crie o arquivo `.env` em `restaurante_app/` com os dados do seu banco e o arquivo `conexao.py`, que como ficam fora do Git, precisam ser criados em cada máquina.
 
-def conectar():
-    return psycopg.connect(
-        host='localhost',
-        port='SUA_PORTA',
-        dbname='restaurante',
-        user='SEU_USUARIO',
-        password='SUA_SENHA'
-    )
-```
+6. Execute:
 
-5. Execute a partir da pasta `restaurante_app`:
+   ```powershell
+   flet run main.py
+   ```
 
-```bash
-cd restaurante_app
-flet run main.py
-```
+## Regras e acabamento
 
-## Diário de desenvolvimento
-
-Passos já feitos, na ordem.
-
-### 1. Estrutura e tela de clientes
-- Criada a pasta `views` com `__init__.py` e o arquivo `clientes.py`.
-- Função `clientes_view(page)` devolve uma `Column` com os campos e o botão.
-- Layout centralizado com `alignment`, `horizontal_alignment` e `expand=True`.
-
-### 2. Navegação
-- Função `mostrar_tela(selecionado)` troca o conteúdo da página conforme a opção escolhida.
-- A lista `opcoes` guarda os nomes das seções, e `menu.selected_index` é atualizado com `opcoes.index(...)`.
-- Os cards da tela inicial usam `on_click=lambda e: mostrar_tela(titulo)`.
-
-### 3. Cadastro de clientes no banco
-- Campos guardados em variáveis para ler o texto com `.value`.
-- Função `cadastrar(e)` dentro de `clientes_view`.
-- `INSERT` com parâmetros (`%s`) para evitar SQL injection.
-- `try/except` para não derrubar o app quando o banco recusa um dado.
-- `SnackBar` verde-água (sucesso) e vermelho (erro).
-
-### 4. Regras e acabamento
 - E-mail único no banco.
 - Máscara de telefone com o evento `on_change`.
-- AppBar verde-água, ícones nos campos (`prefix`) e botão estilizado (`ButtonStyle`).
-
-### 5. Cadastro de funcionários
-- Arquivo `views/funcionarios.py` seguindo o mesmo molde do cadastro de clientes.
-- Cargos já gravados foram padronizados no banco com `UPDATE`.
-
-### 6. Publicação no GitHub
-- `.gitignore` protegendo `venv/`, `__pycache__/`, `.flet/`, `.env` e `conexao.py`.
-- Repositório criado com `git init`, `git add`, `git commit` e `git push`.
+- Funcionários nunca são apagados: a demissão apenas desativa o cadastro.
+- AppBar verde-água, ícones nos campos (`prefix`) e botões estilizados (`ButtonStyle`).
