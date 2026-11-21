@@ -1,6 +1,7 @@
 import flet as ft
-from datetime import datetime
+from datetime import datetime, timedelta
 from conexao import conectar
+from views.clientes import buscar_clientes
 
 COR = {
     'Livre': '#168C8C',
@@ -47,7 +48,7 @@ def cadastrar_mesa(numero, capacidade):
             )
 
 
-def buscar_reserva(id_mesa):
+def buscar_reservas(id_mesa):
     with conectar() as conexao:
         with conexao.cursor() as cursor:
             cursor.execute(
@@ -58,22 +59,22 @@ def buscar_reserva(id_mesa):
                   AND status = 'ativa'
                   AND data_hora >= NOW() - INTERVAL '1 hour'
                 ORDER BY data_hora
-                LIMIT 1
                 ''',
                 (id_mesa,)
             )
-            return cursor.fetchone()
+            return cursor.fetchall()
 
 
-def criar_reserva(id_mesa, nome, telefone, pessoas, data_hora):
+def criar_reserva(id_mesa, id_cliente, nome, telefone, pessoas, data_hora):
     with conectar() as conexao:
         with conexao.cursor() as cursor:
             cursor.execute(
                 '''
-                INSERT INTO reserva(id_mesa, nome_reserva, telefone, num_pessoas, data_hora)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO reserva(id_mesa, id_cliente, nome_reserva, telefone,
+                                    num_pessoas, data_hora)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ''',
-                (id_mesa, nome, telefone, pessoas, data_hora)
+                (id_mesa, id_cliente, nome, telefone, pessoas, data_hora)
             )
 
 
@@ -88,6 +89,34 @@ def cancelar_reserva(id_reserva):
 
 def snack(page, texto, cor='#168C8C'):
     page.show_dialog(ft.SnackBar(content=ft.Text(texto, color='white'), bgcolor=cor))
+
+
+def formatar_telefone(texto):
+    numeros = ''.join(c for c in texto if c.isdigit())[:11]
+
+    if len(numeros) <= 2:
+        return numeros
+    if len(numeros) <= 7:
+        return numeros[:2] + ' ' + numeros[2:]
+    return numeros[:2] + ' ' + numeros[2:7] + '-' + numeros[7:]
+
+
+def formatar_hora(texto):
+    numeros = ''.join(c for c in texto if c.isdigit())[:4]
+
+    if len(numeros) <= 2:
+        return numeros
+    return numeros[:2] + ':' + numeros[2:]
+
+
+def formatar_data(texto):
+    numeros = ''.join(c for c in texto if c.isdigit())[:8]
+
+    if len(numeros) <= 2:
+        return numeros
+    if len(numeros) <= 4:
+        return numeros[:2] + '/' + numeros[2:]
+    return numeros[:2] + '/' + numeros[2:4] + '/' + numeros[4:]
 
 
 def mesas_view(page):
@@ -179,13 +208,89 @@ def mesas_view(page):
         id_mesa, numero, capacidade, situacao = mesa
         page.pop_dialog()
 
+        cliente_escolhido = {'id': None}
+
+        busca_cliente = ft.TextField(
+            label='Buscar cliente cadastrado',
+            prefix=ft.Icon(ft.Icons.SEARCH, color='#168C8C'),
+            hint_text='Nome ou telefone',
+            width=300
+        )
+        sugestoes = ft.Column(spacing=0, width=300)
         campo_nome = ft.TextField(label='Nome da reserva', width=300)
         campo_telefone = ft.TextField(label='Telefone', width=300)
         campo_pessoas = ft.TextField(label=f'Pessoas (máx. {capacidade})', width=300,
                                      keyboard_type=ft.KeyboardType.NUMBER)
-        campo_data = ft.TextField(label='Data (DD/MM/AAAA)', width=300,
-                                  value=datetime.now().strftime('%d/%m/%Y'))
-        campo_hora = ft.TextField(label='Hora (HH:MM)', width=300, hint_text='19:30')
+        campo_data = ft.TextField(label='Data (DD/MM/AAAA)', width=240,
+                                  value=datetime.now().strftime('%d/%m/%Y'),
+                                  max_length=10)
+        campo_hora = ft.TextField(label='Hora (HH:MM)', width=300,
+                                  hint_text='19:30', max_length=5)
+
+        def escolher(ev, cliente):
+            id_cliente, nome, telefone, email = cliente
+            cliente_escolhido['id'] = id_cliente
+
+            campo_nome.value = nome
+            campo_telefone.value = telefone or ''
+            busca_cliente.value = nome
+            sugestoes.controls.clear()
+
+            busca_cliente.update()
+            campo_nome.update()
+            campo_telefone.update()
+            sugestoes.update()
+
+        def sugerir(ev):
+            texto = (busca_cliente.value or '').strip()
+            sugestoes.controls.clear()
+
+            if len(texto) >= 2:
+                for cliente in buscar_clientes(texto)[:5]:
+                    id_cliente, nome, telefone, email = cliente
+                    sugestoes.controls.append(
+                        ft.TextButton(
+                            content=ft.Text(f'{nome} - {telefone}'),
+                            on_click=lambda ev, c=cliente: escolher(ev, c)
+                        )
+                    )
+
+            sugestoes.update()
+
+        def nome_alterado(ev):
+            cliente_escolhido['id'] = None
+
+        def telefone_alterado(ev):
+            campo_telefone.value = formatar_telefone(campo_telefone.value)
+            campo_telefone.update()
+
+        def data_alterada(ev):
+            campo_data.value = formatar_data(campo_data.value)
+            campo_data.update()
+
+        def hora_alterada(ev):
+            campo_hora.value = formatar_hora(campo_hora.value)
+            campo_hora.update()
+
+        def data_escolhida(ev):
+            valor = ev.control.value
+            if valor:
+                campo_data.value = f'{valor:%d/%m/%Y}'
+                campo_data.update()
+
+        def abrir_calendario(ev):
+            hoje = datetime.now()
+            page.show_dialog(ft.DatePicker(
+                first_date=hoje,
+                last_date=hoje + timedelta(days=365),
+                on_change=data_escolhida
+            ))
+
+        busca_cliente.on_change = sugerir
+        campo_nome.on_change = nome_alterado
+        campo_telefone.on_change = telefone_alterado
+        campo_data.on_change = data_alterada
+        campo_hora.on_change = hora_alterada
 
         def salvar(ev):
             if not campo_nome.value.strip() or not campo_pessoas.value.isdigit():
@@ -203,11 +308,23 @@ def mesas_view(page):
                     '%d/%m/%Y %H:%M'
                 )
             except ValueError:
-                snack(page, 'Data ou hora inválida', '#C62828')
+                snack(page, 'Data ou hora inválida. Use DD/MM/AAAA e HH:MM (ex.: 19:30)',
+                      '#C62828')
                 return
 
-            criar_reserva(id_mesa, campo_nome.value.strip(), campo_telefone.value.strip(),
-                          pessoas, data_hora)
+            if data_hora < datetime.now():
+                snack(page, 'Não é possível reservar para um horário que já passou',
+                      '#C62828')
+                return
+
+            criar_reserva(
+                id_mesa,
+                cliente_escolhido['id'],
+                campo_nome.value.strip(),
+                campo_telefone.value.strip(),
+                pessoas,
+                data_hora
+            )
             page.pop_dialog()
             snack(page, f'Mesa {numero} reservada para {campo_nome.value.strip()}')
             recarregar()
@@ -216,8 +333,30 @@ def mesas_view(page):
             modal=True,
             title=ft.Text(f'Reservar mesa {numero}'),
             content=ft.Column(
-                tight=True, spacing=12,
-                controls=[campo_nome, campo_telefone, campo_pessoas, campo_data, campo_hora]
+                tight=True,
+                spacing=12,
+                scroll=ft.ScrollMode.AUTO,
+                width=320,
+                controls=[
+                    busca_cliente,
+                    sugestoes,
+                    campo_nome,
+                    campo_telefone,
+                    campo_pessoas,
+                    ft.Row(
+                        spacing=0,
+                        controls=[
+                            campo_data,
+                            ft.IconButton(
+                                icon=ft.Icons.CALENDAR_MONTH,
+                                icon_color='#168C8C',
+                                tooltip='Escolher no calendário',
+                                on_click=abrir_calendario
+                            ),
+                        ]
+                    ),
+                    campo_hora,
+                ]
             ),
             actions=[
                 ft.TextButton('Cancelar', on_click=lambda ev: page.pop_dialog()),
@@ -229,28 +368,66 @@ def mesas_view(page):
     def abrir_mesa(e, mesa):
         page = e.page
         id_mesa, numero, capacidade, situacao = mesa
-        reserva = buscar_reserva(id_mesa)
+        reservas = buscar_reservas(id_mesa)
+
+        def cancelar(ev, id_reserva, nome):
+            cancelar_reserva(id_reserva)
+            page.pop_dialog()
+            snack(page, f'Reserva de {nome} cancelada')
+            recarregar()
+
+            for m in buscar_mesas():
+                if m[0] == id_mesa:
+                    abrir_mesa(ev, m)
+                    break
 
         conteudo = [
             ft.Text(f'Capacidade: {capacidade} pessoas'),
             ft.Text(f'Situação: {situacao}', weight=ft.FontWeight.BOLD, color=COR[situacao]),
         ]
-        acoes = [ft.TextButton('Fechar', on_click=lambda ev: page.pop_dialog())]
 
-        if reserva:
-            id_reserva, nome, pessoas, data_hora = reserva
+        if reservas:
+            conteudo.append(ft.Divider(height=1))
+            conteudo.append(ft.Text('Reservas', weight=ft.FontWeight.BOLD))
+
+            linhas = []
+            for id_reserva, nome, pessoas, data_hora in reservas:
+                linhas.append(
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Column(
+                                spacing=0,
+                                expand=True,
+                                controls=[
+                                    ft.Text(nome, weight=ft.FontWeight.W_500),
+                                    ft.Text(f'{data_hora:%d/%m/%Y às %H:%M}  ·  '
+                                            f'{pessoas} pessoas',
+                                            size=13, color='#6B778C'),
+                                ]
+                            ),
+                            ft.IconButton(
+                                icon=ft.Icons.EVENT_BUSY,
+                                icon_color='#C62828',
+                                tooltip='Cancelar esta reserva',
+                                on_click=lambda ev, i=id_reserva, n=nome: cancelar(ev, i, n)
+                            ),
+                        ]
+                    )
+                )
+
             conteudo.append(
-                ft.Text(f'Próxima reserva: {nome}, {pessoas} pessoas, '
-                        f'{data_hora:%d/%m às %H:%M}')
+                ft.Column(
+                    spacing=4,
+                    height=min(len(linhas) * 60, 240),
+                    scroll=ft.ScrollMode.AUTO,
+                    controls=linhas
+                )
             )
+        else:
+            conteudo.append(ft.Text('Nenhuma reserva para esta mesa.', color='#6B778C'))
 
-            def cancelar(ev):
-                cancelar_reserva(id_reserva)
-                page.pop_dialog()
-                snack(page, 'Reserva cancelada')
-                recarregar()
-
-            acoes.append(ft.TextButton('Cancelar reserva', on_click=cancelar))
+        acoes = [ft.TextButton('Fechar', on_click=lambda ev: page.pop_dialog())]
 
         if situacao != 'Ocupada':
             acoes.append(
@@ -262,7 +439,7 @@ def mesas_view(page):
         page.show_dialog(ft.AlertDialog(
             modal=True,
             title=ft.Text(f'Mesa {numero}'),
-            content=ft.Column(tight=True, spacing=8, controls=conteudo),
+            content=ft.Column(tight=True, spacing=8, width=360, controls=conteudo),
             actions=acoes
         ))
 
