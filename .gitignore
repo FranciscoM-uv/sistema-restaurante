@@ -1,5 +1,6 @@
 venv/
-__pycache__/
-.flet/
 .env
+__pycache__/
+*.pyc
+.flet/
 conexao.py
